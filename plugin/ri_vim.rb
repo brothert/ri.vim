@@ -50,7 +50,7 @@ class RIVim
                          *options[:extra_doc_dirs]) do |path, type|
       if File.exist?(path)
         @doc_dirs << path
-        store = RDoc::RI::Store.new path, type
+        store = RDoc::RI::Store.new(RDoc::Options.new, path:, type:)
         store.load_cache
         @stores << store
       end
@@ -104,7 +104,7 @@ class RIVim
         out << RDoc::Markup::Paragraph.new("#{name} (from #{path})")
         if include.comment then
           out << RDoc::Markup::BlankLine.new
-          out << include.comment
+          out << include.comment.parse
         end
       else
         out << RDoc::Markup::Paragraph.new("(from #{store.friendly_path})")
@@ -216,7 +216,7 @@ class RIVim
       add_from out, store
       unless comment.empty? then
         out << RDoc::Markup::Rule.new(1)
-        out << comment
+        out << comment.parse
       end
       if class_methods or instance_methods or not klass.constants.empty? then
         out << RDoc::Markup::Rule.new(1)
@@ -227,10 +227,10 @@ class RIVim
         list = RDoc::Markup::List.new :NOTE
         constants = klass.constants.sort_by { |constant| constant.name }
         list.push(*constants.map do |constant|
-          parts = constant.comment.parts if constant.comment
-          parts << RDoc::Markup::Paragraph.new('[not documented]') if
-            parts.empty?
-          RDoc::Markup::ListItem.new(constant.name, *parts)
+          comment = constant.comment.parse
+          comment = RDoc::Markup::Paragraph.new('[not documented]') if
+            comment.parts.empty?
+          RDoc::Markup::ListItem.new(constant.name, *comment)
         end)
         out << list
       end
@@ -270,7 +270,7 @@ class RIVim
           out << RDoc::Markup::Rule.new(1)
         end
         out << RDoc::Markup::BlankLine.new
-        out << method.comment
+        out << method.comment.parse
         out << RDoc::Markup::BlankLine.new
       end
     end
@@ -468,7 +468,7 @@ class RIVim
           bmethod = "##{method}"
         end
         method_obj = store.load_method classname, bmethod
-        bsize = method_obj.comment.parts.size
+        bsize = method_obj.comment.parse.parts.reject(&:empty?).length
         if bsize > 0
           size = " (#{bsize})"
         end
